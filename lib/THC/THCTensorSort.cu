@@ -58,5 +58,5 @@ void THCudaLongTensor_fillSliceWithIndex(THCState* state,
 
 #undef FILL_INDEX
 
-  THCudaCheck(cudaGetLastError());
+  THCudaCheck(hipGetLastError());
 }

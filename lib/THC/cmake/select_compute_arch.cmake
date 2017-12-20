@@ -44,19 +44,19 @@ endif ()
 #
 function(CUDA_DETECT_INSTALLED_GPUS OUT_VARIABLE)
   if(NOT CUDA_GPU_DETECT_OUTPUT)
-    set(cufile ${PROJECT_BINARY_DIR}/detect_cuda_archs.cu)
+    set(cufile ${PROJECT_BINARY_DIR}/detect_hip_archs.cu)
 
     file(WRITE ${cufile} ""
       "#include <cstdio>\n"
       "int main()\n"
       "{\n"
       "  int count = 0;\n"
-      "  if (cudaSuccess != cudaGetDeviceCount(&count)) return -1;\n"
+      "  if (hipSuccess != hipGetDeviceCount(&count)) return -1;\n"
       "  if (count == 0) return -1;\n"
       "  for (int device = 0; device < count; ++device)\n"
       "  {\n"
-      "    cudaDeviceProp prop;\n"
-      "    if (cudaSuccess == cudaGetDeviceProperties(&prop, device))\n"
+      "    hipDeviceProp_t prop;\n"
+      "    if (hipSuccess == hipGetDeviceProperties(&prop, device))\n"
       "      std::printf(\"%d.%d \", prop.major, prop.minor);\n"
       "  }\n"
       "  return 0;\n"
@@ -98,8 +98,8 @@ function(CUDA_SELECT_NVCC_ARCH_FLAGS out_variable)
     set(CUDA_ARCH_LIST "Auto")
   endif()
 
-  set(cuda_arch_bin)
-  set(cuda_arch_ptx)
+  set(hip_arch_bin)
+  set(hip_arch_ptx)
 
   if("${CUDA_ARCH_LIST}" STREQUAL "All")
     set(CUDA_ARCH_LIST ${CUDA_KNOWN_GPU_ARCHITECTURES})
@@ -150,33 +150,33 @@ function(CUDA_SELECT_NVCC_ARCH_FLAGS out_variable)
     if(NOT arch_bin)
       message(SEND_ERROR "arch_bin wasn't set for some reason")
     endif()
-    list(APPEND cuda_arch_bin ${arch_bin})
+    list(APPEND hip_arch_bin ${arch_bin})
     if(add_ptx)
       if (NOT arch_ptx)
         set(arch_ptx ${arch_bin})
       endif()
-      list(APPEND cuda_arch_ptx ${arch_ptx})
+      list(APPEND hip_arch_ptx ${arch_ptx})
     endif()
   endforeach()
 
   # remove dots and convert to lists
-  string(REGEX REPLACE "\\." "" cuda_arch_bin "${cuda_arch_bin}")
-  string(REGEX REPLACE "\\." "" cuda_arch_ptx "${cuda_arch_ptx}")
-  string(REGEX MATCHALL "[0-9()]+" cuda_arch_bin "${cuda_arch_bin}")
-  string(REGEX MATCHALL "[0-9]+"   cuda_arch_ptx "${cuda_arch_ptx}")
+  string(REGEX REPLACE "\\." "" hip_arch_bin "${hip_arch_bin}")
+  string(REGEX REPLACE "\\." "" hip_arch_ptx "${hip_arch_ptx}")
+  string(REGEX MATCHALL "[0-9()]+" hip_arch_bin "${hip_arch_bin}")
+  string(REGEX MATCHALL "[0-9]+"   hip_arch_ptx "${hip_arch_ptx}")
 
-  if(cuda_arch_bin)
-    list(REMOVE_DUPLICATES cuda_arch_bin)
+  if(hip_arch_bin)
+    list(REMOVE_DUPLICATES hip_arch_bin)
   endif()
-  if(cuda_arch_ptx)
-    list(REMOVE_DUPLICATES cuda_arch_ptx)
+  if(hip_arch_ptx)
+    list(REMOVE_DUPLICATES hip_arch_ptx)
   endif()
 
   set(nvcc_flags "")
   set(nvcc_archs_readable "")
 
   # Tell NVCC to add binaries for the specified GPUs
-  foreach(arch ${cuda_arch_bin})
+  foreach(arch ${hip_arch_bin})
     if(arch MATCHES "([0-9]+)\\(([0-9]+)\\)")
       # User explicitly specified ARCH for the concrete CODE
       list(APPEND nvcc_flags -gencode arch=compute_${CMAKE_MATCH_2},code=sm_${CMAKE_MATCH_1})
@@ -189,7 +189,7 @@ function(CUDA_SELECT_NVCC_ARCH_FLAGS out_variable)
   endforeach()
 
   # Tell NVCC to add PTX intermediate code for the specified architectures
-  foreach(arch ${cuda_arch_ptx})
+  foreach(arch ${hip_arch_ptx})
     list(APPEND nvcc_flags -gencode arch=compute_${arch},code=compute_${arch})
     list(APPEND nvcc_archs_readable compute_${arch})
   endforeach()

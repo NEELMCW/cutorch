@@ -2,28 +2,28 @@
 #define THC_GENERIC_FILE "generic/THCTensor.cu"
 #else
 
-cudaTextureObject_t THCTensor_(getTextureObject)(THCState *state, THCTensor *self)
+hipTextureObject_t THCTensor_(getTextureObject)(THCState *state, THCTensor *self)
 {
   THCAssertSameGPU(THCTensor_(checkGPU)(state, 1, self));
-  cudaTextureObject_t texObj;
-  struct cudaResourceDesc resDesc;
+  hipTextureObject_t texObj;
+  struct hipResourceDesc resDesc;
   memset(&resDesc, 0, sizeof(resDesc));
-  resDesc.resType = cudaResourceTypeLinear;
+  resDesc.resType = hipResourceTypeLinear;
   resDesc.res.linear.devPtr = THCTensor_(data)(state, self);
   resDesc.res.linear.sizeInBytes = THCTensor_(nElement)(state, self) * 4;
-  resDesc.res.linear.desc = cudaCreateChannelDesc(32, 0, 0, 0,
-                                                  cudaChannelFormatKindFloat);
-  struct cudaTextureDesc texDesc;
+  resDesc.res.linear.desc = hipCreateChannelDesc(32, 0, 0, 0,
+                                                  hipChannelFormatKindFloat);
+  struct hipTextureDesc texDesc;
   memset(&texDesc, 0, sizeof(texDesc));
-  cudaCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
-  cudaError errcode = cudaGetLastError();
-  if(errcode != cudaSuccess) {
+  hipCreateTextureObject(&texObj, &resDesc, &texDesc, NULL);
+  hipError_t errcode = hipGetLastError();
+  if(errcode != hipSuccess) {
     if (THCTensor_(nElement)(state, self) > 2>>27)
       THError("Failed to create texture object, "
               "nElement:%ld exceeds 27-bit addressing required for tex1Dfetch. Cuda Error: %s",
-              THCTensor_(nElement)(state, self), cudaGetErrorString(errcode));
+              THCTensor_(nElement)(state, self), hipGetErrorString(errcode));
     else
-      THError("Failed to create texture object: %s", cudaGetErrorString(errcode));
+      THError("Failed to create texture object: %s", hipGetErrorString(errcode));
   }
   return texObj;
 }

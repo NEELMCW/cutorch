@@ -284,7 +284,7 @@ void THCudaBlas_Hgemm(THCState *state, char transa, char transb, long m, long n,
                                   a, CUDA_R_16F, i_lda, b, CUDA_R_16F,
                                   i_ldb, &fBeta, c, CUDA_R_16F, i_ldc));
 #else
-      cudaDeviceProp* prop = THCState_getCurrentDeviceProperties(state);
+      hipDeviceProp_t* prop = THCState_getCurrentDeviceProperties(state);
       if (prop->major >= 5){
         THCublasCheck(cublasSetMathMode(handle, CUBLAS_TENSOR_OP_MATH));
         THCublasCheck(cublasGemmEx(handle, opa, opb,

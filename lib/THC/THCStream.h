@@ -6,7 +6,7 @@
 
 struct THCStream
 {
-    cudaStream_t stream;
+    hipStream_t stream;
     int device;
     int refcount;
 };

@@ -50,8 +50,8 @@ __host__ void THCRandom_getRNGState(THCState* state, THByteTensor *rng_state)
   THByteTensor_resize1d(rng_state, total_size);
   THArgCheck(THByteTensor_nElement(rng_state) == total_size, 1, "RNG state is wrong size");
   THArgCheck(THByteTensor_isContiguous(rng_state), 1, "RNG state must be contiguous");
-  THCudaCheck(cudaMemcpy(THByteTensor_data(rng_state), gen->gen_states,
-                         states_size, cudaMemcpyDeviceToHost));
+  THCudaCheck(hipMemcpy(THByteTensor_data(rng_state), gen->gen_states,
+                         states_size, hipMemcpyDeviceToHost));
   memcpy(THByteTensor_data(rng_state) + states_size, &gen->initial_seed, seed_size);
 }
 
@@ -70,8 +70,8 @@ __host__ void THCRandom_setRNGState(THCState* state, THByteTensor *rng_state)
   THArgCheck(THByteTensor_nElement(rng_state) == total_size, 1, "RNG state is wrong size");
   THArgCheck(THByteTensor_isContiguous(rng_state), 1, "RNG state must be contiguous");
 
-  THCudaCheck(cudaMemcpy(gen->gen_states, THByteTensor_data(rng_state),
-                         states_size, cudaMemcpyHostToDevice));
+  THCudaCheck(hipMemcpy(gen->gen_states, THByteTensor_data(rng_state),
+                         states_size, hipMemcpyHostToDevice));
   set_rngstate_kernel<<<1, MAX_NUM_BLOCKS, 0, THCState_getCurrentStream(state)>>>(
       gen->gen_states, gen->kernel_params);
   memcpy(&gen->initial_seed, THByteTensor_data(rng_state) + states_size, seed_size);

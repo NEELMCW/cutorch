@@ -7,7 +7,7 @@ static void *THCudaHostAllocator_malloc(void* ctx, ptrdiff_t size) {
 
   if (size == 0) return NULL;
 
-  THCudaCheck(cudaMallocHost(&ptr, size));
+  THCudaCheck(hipMallocHost(&ptr, size));
 
   return ptr;
 }
@@ -15,7 +15,7 @@ static void *THCudaHostAllocator_malloc(void* ctx, ptrdiff_t size) {
 static void THCudaHostAllocator_free(void* ctx, void* ptr) {
   if (!ptr) return;
 
-  THCudaCheck(cudaFreeHost(ptr));
+  THCudaCheck(hipFreeHost(ptr));
 }
 
 THAllocator THCudaHostAllocator = {
@@ -24,27 +24,27 @@ THAllocator THCudaHostAllocator = {
   &THCudaHostAllocator_free
 };
 
-static cudaError_t THCIpcAllocator_malloc(void* ctx, void** devPtr, size_t size, cudaStream_t stream)
+static hipError_t THCIpcAllocator_malloc(void* ctx, void** devPtr, size_t size, hipStream_t stream)
 {
   THError("THCIpcAllocator.malloc() not supported");
-  return cudaSuccess;
+  return hipSuccess;
 }
 
-static cudaError_t THCIpcAllocator_free(void* ctx, void* devPtr)
+static hipError_t THCIpcAllocator_free(void* ctx, void* devPtr)
 {
-  cudaError_t err;
+  hipError_t err;
   int prev_device;
   int device = (int)(long)ctx;
 
-  err = cudaGetDevice(&prev_device);
-  if (err != cudaSuccess) { return err; }
+  err = hipGetDevice(&prev_device);
+  if (err != hipSuccess) { return err; }
 
-  err = cudaSetDevice(device);
-  if (err != cudaSuccess) { return err; }
+  err = hipSetDevice(device);
+  if (err != hipSuccess) { return err; }
 
-  err = cudaIpcCloseMemHandle(devPtr);
+  err = hipIpcCloseMemHandle(devPtr);
 
-  cudaSetDevice(prev_device);
+  hipSetDevice(prev_device);
   return err;
 }
 
@@ -64,13 +64,13 @@ static void *THCUVAAllocator_alloc(void* ctx, ptrdiff_t size) {
   // See J.1.1 of the CUDA_C_Programming_Guide.pdf for UVA and coherence rules
   // on various compute capabilities.
   void* ptr;
-  THCudaCheck(cudaMallocManaged(&ptr, size, cudaMemAttachGlobal));
+  THCudaCheck(hipMallocManaged(&ptr, size, hipMemAttachGlobal));
   return ptr;
 }
 
 static void THCUVAAllocator_free(void* ctx, void* ptr) {
   if (!ptr) return;
-  THCudaCheck(cudaFree(ptr));
+  THCudaCheck(hipFree(ptr));
 }
 
 THAllocator THCUVAAllocator = {

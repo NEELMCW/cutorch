@@ -356,9 +356,9 @@ __host__ void THCTensor_varOuterDim(THCState *state, TensorTypeK *tgt, TensorTyp
     THCTensor_kernel_varOuterDim<Real, false, apply_sqrt><<<grid, threads, 0, THCState_getCurrentStream(state)>>>(
         TensorUtils<TensorTypeK>::getData(state, tgt), TensorUtils<TensorTypeK>::getData(state, src), num_orows, num_irows, row_size);
   }
-  cudaError errcode = cudaGetLastError();
-  if (errcode != cudaSuccess) {
-    THError(cudaGetErrorString(errcode));
+  hipError_t errcode = hipGetLastError();
+  if (errcode != hipSuccess) {
+    THError(hipGetErrorString(errcode));
   }
 }
 
@@ -438,9 +438,9 @@ __host__ void THCTensor_varInnermostDim(THCState *state, TensorTypeK *tgt, Tenso
     THCTensor_kernel_varInnermostDim<Real, false, apply_sqrt><<<grid, threads, 0, THCState_getCurrentStream(state)>>>(
         TensorUtils<TensorTypeK>::getData(state, tgt), TensorUtils<TensorTypeK>::getData(state, src), num_rows, row_size);
   }
-  cudaError errcode = cudaGetLastError();
-  if (errcode != cudaSuccess) {
-    THError(cudaGetErrorString(errcode));
+  hipError_t errcode = hipGetLastError();
+  if (errcode != hipSuccess) {
+    THError(hipGetErrorString(errcode));
   }
 }
 
@@ -516,7 +516,7 @@ THC_transformReduceOuterDimIndex(THCState *state,
       TensorUtils<TensorTypeK>::getData(state, src),
       num_orows, num_irows, row_size, init, binary_op);
 
-  THCudaCheck(cudaGetLastError());
+  THCudaCheck(hipGetLastError());
 }
 
 /* Reduce the innermost dimension of a tensor (on thrust::pair functors which are (value, index))
@@ -613,7 +613,7 @@ THC_transformReduceInnermostDimIndex(THCState *state,
       TensorUtils<TensorTypeK>::getData(state, src),
       num_rows, row_size, init, binary_op);
 
-  THCudaCheck(cudaGetLastError());
+  THCudaCheck(hipGetLastError());
 }
 
 template <typename TensorTypeK,

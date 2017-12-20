@@ -108,7 +108,7 @@ void THCTensor_(renormRows)(struct THCState* state,
   long rows = THCTensor_(size)(state, t, 0);
   long cols = THCTensor_(size)(state, t, 1);
 
-  cudaDeviceProp* props = THCState_getCurrentDeviceProperties(state);
+  hipDeviceProp_t* props = THCState_getCurrentDeviceProperties(state);
   THAssert(props != NULL);
 
   int numSM = props->multiProcessorCount;
@@ -169,7 +169,7 @@ THC_API void THCTensor_(multinomial)(struct THCState *state,
   THCudaLongTensor_resize2d(state, self, numDist, n_sample);
 
   // get current device properties
-  cudaDeviceProp* props = THCState_getCurrentDeviceProperties(state);
+  hipDeviceProp_t* props = THCState_getCurrentDeviceProperties(state);
   THAssert(props != NULL);
   int numSM = props->multiProcessorCount;
   int maxThreads = props->maxThreadsPerBlock;

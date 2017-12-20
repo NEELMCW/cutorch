@@ -18,8 +18,8 @@ THCStream* THCStream_new(int flags)
 {
   THCStream* self = (THCStream*) malloc(sizeof(THCStream));
   self->refcount = 1;
-  THCudaCheck(cudaGetDevice(&self->device));
-  THCudaCheck(cudaStreamCreateWithFlags(&self->stream, flags));
+  THCudaCheck(hipGetDevice(&self->device));
+  THCudaCheck(hipStreamCreateWithFlags(&self->stream, flags));
   return self;
 }
 
@@ -36,8 +36,8 @@ THCStream* THCStream_newWithPriority(int flags, int priority)
 {
   THCStream* self = (THCStream*) malloc(sizeof(THCStream));
   self->refcount = 1;
-  THCudaCheck(cudaGetDevice(&self->device));
-  THCudaCheck(cudaStreamCreateWithPriority(&self->stream, flags, priority));
+  THCudaCheck(hipGetDevice(&self->device));
+  THCudaCheck(hipStreamCreateWithPriority(&self->stream, flags, priority));
   return self;
 }
 
@@ -47,7 +47,7 @@ void THCStream_free(THCStream* self)
     return;
   }
   if (THAtomicDecrementRef(&self->refcount)) {
-    THCudaCheckWarn(cudaStreamDestroy(self->stream));
+    THCudaCheckWarn(hipStreamDestroy(self->stream));
     free(self);
   }
 }

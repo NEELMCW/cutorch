@@ -1,7 +1,7 @@
 #ifndef THC_NUMERICS_INC
 #define THC_NUMERICS_INC
 
-#include <cuda.h>
+#include <hip/hip_runtime.h>
 #include <limits.h>
 #include "THCHalf.h"
 

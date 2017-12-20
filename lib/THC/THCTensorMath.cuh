@@ -28,7 +28,7 @@ __global__ void THCTensor_copyToDiagonal(T* a, T* b, ptrdiff_t start, ptrdiff_t 
 
 inline bool getCatGrid(THCState* state, ptrdiff_t nTensors, dim3& grid) {
   int curDevice = -1;
-  cudaGetDevice(&curDevice);
+  hipGetDevice(&curDevice);
 
   if (curDevice == -1) {
      return false;

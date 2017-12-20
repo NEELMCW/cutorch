@@ -367,7 +367,7 @@ THC_API void THCudaTensor_conv2Dmv(THCState *state, THCudaTensor *output, float 
   float *weight_data = THCudaTensor_data(state, kernel);
   float *output_data = THCudaTensor_data(state, output);
 
-  // cuda blocks & threads:
+  // hip blocks & threads:
   int yblocks = (int)(16L / nOutputPlane);
   yblocks = yblocks < 1 ? 1 : yblocks;
   dim3 blocks(nOutputPlane,yblocks);
@@ -401,9 +401,9 @@ THC_API void THCudaTensor_conv2Dmv(THCState *state, THCudaTensor *output, float 
   THCudaTensor_free(state, kernel);
 
   // check for errors
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("error in conv2Dmv: %s\n", cudaGetErrorString(err));
+  hipError_t err = hipGetLastError();
+  if (err != hipSuccess) {
+    printf("error in conv2Dmv: %s\n", hipGetErrorString(err));
     THError("aborting");
   }
 }
@@ -488,7 +488,7 @@ THC_API void THCudaTensor_conv2Dmm(THCState *state, THCudaTensor *output, float 
   float *weight_data = THCudaTensor_data(state, kernel);
   float *output_data = THCudaTensor_data(state, output);
 
-  // cuda blocks & threads:
+  // hip blocks & threads:
   int yblocks = (int)(16L / nOutputPlane);
   yblocks = yblocks < 1 ? 1 : yblocks;
   dim3 blocks(nOutputPlane*nbatch,yblocks);
@@ -522,11 +522,11 @@ THC_API void THCudaTensor_conv2Dmm(THCState *state, THCudaTensor *output, float 
   THCudaTensor_free(state, kernel);
 
   // check for errors
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    printf("error in conv2Dmm: %s\n", cudaGetErrorString(err));
+  hipError_t err = hipGetLastError();
+  if (err != hipSuccess) {
+    hipDeviceProp_t deviceProp;
+    hipGetDeviceProperties(&deviceProp, 0);
+    printf("error in conv2Dmm: %s\n", hipGetErrorString(err));
     printf("requested grid size: %dx%dx%d, max allowed: %dx%dx%d\n",
            blocks.x, blocks.y, blocks.z,
            deviceProp.maxGridSize[0], deviceProp.maxGridSize[1], deviceProp.maxGridSize[2]);
@@ -605,9 +605,9 @@ THC_API void THCudaTensor_conv2DRevger(THCState *state, THCudaTensor *output, fl
   THCudaTensor_free(state, kernel);
 
   // check for errors
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("error in conv2DRevger: %s\n", cudaGetErrorString(err));
+  hipError_t err = hipGetLastError();
+  if (err != hipSuccess) {
+    printf("error in conv2DRevger: %s\n", hipGetErrorString(err));
     THError("aborting");
   }
 }
@@ -687,9 +687,9 @@ THC_API void THCudaTensor_conv2DRevgerm(THCState *state, THCudaTensor *output, f
   THCudaTensor_free(state, kernel);
 
   // check for errors
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("error in conv2DRevger: %s\n", cudaGetErrorString(err));
+  hipError_t err = hipGetLastError();
+  if (err != hipSuccess) {
+    printf("error in conv2DRevger: %s\n", hipGetErrorString(err));
     THError("aborting");
   }
 }
@@ -943,9 +943,9 @@ THC_API void THCudaTensor_conv2Dmap(THCState *state, THCudaTensor *output, THCud
   THCudaTensor_free(state, table);
 
   // check for errors
-  cudaError_t err = cudaGetLastError();
-  if (err != cudaSuccess) {
-    printf("error in conv2Dmap: %s\n", cudaGetErrorString(err));
+  hipError_t err = hipGetLastError();
+  if (err != hipSuccess) {
+    printf("error in conv2Dmap: %s\n", hipGetErrorString(err));
     THError("aborting");
   }
 }

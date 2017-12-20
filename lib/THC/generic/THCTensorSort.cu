@@ -150,7 +150,7 @@ THC_API void THCTensor_(sortKeyValueInplace)(THCState* state,
 #undef HANDLE_SORT_CASE
 #undef HANDLE_A_CASE
 
-  THCudaCheck(cudaGetLastError());
+  THCudaCheck(hipGetLastError());
 }
 
 void sortViaThrust(THCState* state,
@@ -330,7 +330,7 @@ THC_API void THCTensor_(sort)(THCState* state,
     sortViaThrust(state, sorted, indices, input, dim, (bool) order);
   }
 
-  THCudaCheck(cudaGetLastError());
+  THCudaCheck(hipGetLastError());
 }
 
 #endif

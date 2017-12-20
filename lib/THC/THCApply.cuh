@@ -103,7 +103,7 @@ inline dim3 getApplyBlock() {
 
 inline bool getApplyGrid(THCState* state, ptrdiff_t totalElements, dim3& grid) {
   int curDevice = -1;
-  cudaGetDevice(&curDevice);
+  hipGetDevice(&curDevice);
 
   if (curDevice == -1) {
     return false;
