@@ -133,7 +133,7 @@ void checkAndCountListOfGPUStreamPairs(lua_State *L, THCState *state, int arg,
 }
 
 int createSingleDeviceEvents(lua_State *L, THCState *state, int arg,
-                             int device, cudaEvent_t* event)
+                             int device, hipEvent_t* event)
 {
 
   /* Push table to top */
@@ -144,10 +144,10 @@ int createSingleDeviceEvents(lua_State *L, THCState *state, int arg,
   int i = 0;
   while (lua_next(L, -2)) {
     int streamId = (int) lua_tonumber(L, -1);
-    cudaStream_t streamWaitingOn =
+    hipStream_t streamWaitingOn =
       THCState_getDeviceStream(state, device, streamId);
-    THCudaCheck(cudaEventCreateWithFlags(&event[i], cudaEventDisableTiming));
-    THCudaCheck(cudaEventRecord(event[i], streamWaitingOn));
+    THCudaCheck(hipEventCreateWithFlags(&event[i], hipEventDisableTiming));
+    THCudaCheck(hipEventRecord(event[i], streamWaitingOn));
     lua_pop(L, 1);
     i++;
   }
@@ -157,7 +157,7 @@ int createSingleDeviceEvents(lua_State *L, THCState *state, int arg,
 }
 
 void createMultiDeviceEvents(lua_State *L, THCState *state, int arg,
-                             cudaEvent_t* events)
+                             hipEvent_t* events)
 {
   /* Push {gpu={streams...}} table */
   lua_pushvalue(L, arg);
@@ -167,7 +167,7 @@ void createMultiDeviceEvents(lua_State *L, THCState *state, int arg,
   lua_pushnil(L);
   while (lua_next(L, -2)) {
     int device = (int) lua_tonumber(L, -2) - 1;
-    THCudaCheck(cudaSetDevice(device));
+    THCudaCheck(hipSetDevice(device));
     events += createSingleDeviceEvents(L, state, -1, device, events);
     ++gpu;
 
@@ -179,7 +179,7 @@ void createMultiDeviceEvents(lua_State *L, THCState *state, int arg,
 }
 
 void waitSingleDeviceEvents(lua_State *L, THCState *state, int arg,
-                           int device, cudaEvent_t * event, int numEvents)
+                           int device, hipEvent_t * event, int numEvents)
 {
   /* Push table to top */
   lua_pushvalue(L, arg);
@@ -189,10 +189,10 @@ void waitSingleDeviceEvents(lua_State *L, THCState *state, int arg,
   lua_pushnil(L);
   while (lua_next(L, -2)) {
     int streamId = (int) lua_tonumber(L, -1);
-    cudaStream_t stream =
+    hipStream_t stream =
       THCState_getDeviceStream(state, device, streamId);
     for (int i = 0; i < numEvents; i++) {
-      THCudaCheck(cudaStreamWaitEvent(stream, event[i], 0));
+      THCudaCheck(hipStreamWaitEvent(stream, event[i], 0));
     }
     lua_pop(L, 1);
   }
@@ -203,7 +203,7 @@ void waitSingleDeviceEvents(lua_State *L, THCState *state, int arg,
 
 
 void waitMultiDeviceEvents(lua_State *L, THCState *state, int arg,
-                           cudaEvent_t* events, int streams)
+                           hipEvent_t* events, int streams)
 {
   /* Push {gpu={streams...}} table */
   lua_pushvalue(L, arg);
@@ -213,7 +213,7 @@ void waitMultiDeviceEvents(lua_State *L, THCState *state, int arg,
   lua_pushnil(L);
   while (lua_next(L, -2)) {
     int device = (int) lua_tonumber(L, -2) - 1;
-    THCudaCheck(cudaSetDevice(device));
+    THCudaCheck(hipSetDevice(device));
 
     /* Push stream table */
     lua_pushvalue(L, -1);
@@ -221,12 +221,12 @@ void waitMultiDeviceEvents(lua_State *L, THCState *state, int arg,
     while (lua_next(L, -2)) {
       int streamId = (int) lua_tonumber(L, -1);
 
-      cudaStream_t stream =
+      hipStream_t stream =
         THCState_getDeviceStream(state, device, streamId);
 
       /* Each stream waits on all events */
       for (int i = 0; i < streams; ++i) {
-        THCudaCheck(cudaStreamWaitEvent(stream, events[i], 0));
+        THCudaCheck(hipStreamWaitEvent(stream, events[i], 0));
       }
 
       lua_pop(L, 1);
@@ -243,7 +243,7 @@ void waitMultiDeviceEvents(lua_State *L, THCState *state, int arg,
 /* Synchronizes the host with respect to the current device */
 static int cutorch_synchronize(lua_State *L)
 {
-  THCudaCheck(cudaDeviceSynchronize());
+  THCudaCheck(hipDeviceSynchronize());
   return 0;
 }
 
@@ -251,17 +251,17 @@ static int cutorch_synchronize(lua_State *L)
 static int cutorch_synchronizeAll(lua_State *L)
 {
   int prevDev = -1;
-  THCudaCheck(cudaGetDevice(&prevDev));
+  THCudaCheck(hipGetDevice(&prevDev));
 
   int devices = -1;
-  THCudaCheck(cudaGetDeviceCount(&devices));
+  THCudaCheck(hipGetDeviceCount(&devices));
 
   for (int i = 0; i < devices; ++i) {
-    THCudaCheck(cudaSetDevice(i));
-    THCudaCheck(cudaDeviceSynchronize());
+    THCudaCheck(hipSetDevice(i));
+    THCudaCheck(hipDeviceSynchronize());
   }
 
-  THCudaCheck(cudaSetDevice(prevDev));
+  THCudaCheck(hipSetDevice(prevDev));
 
   return 0;
 }
@@ -429,11 +429,11 @@ static int cutorch_streamWaitFor(lua_State *L)
   THCState *state = cutorch_getstate(L);
 
   int curDev = -1;
-  THCudaCheck(cudaGetDevice(&curDev));
+  THCudaCheck(hipGetDevice(&curDev));
 
   /* Check that the waiting stream is in bounds; this will error out if not */
   int waitingId = (int) luaL_checknumber(L, 1);
-  cudaStream_t streamWaiting =
+  hipStream_t streamWaiting =
     THCState_getDeviceStream(state, curDev, waitingId);
 
   /* Validate the streams that we are waiting on */
@@ -445,12 +445,12 @@ static int cutorch_streamWaitFor(lua_State *L)
   }
   /* One-way dependency; streamWaiting will wait for the list of streams to
      wait on to complete execution of pending scheduled kernels/events */
-  cudaEvent_t * events = (cudaEvent_t*)malloc(sizeof(cudaEvent_t) * streams);
+  hipEvent_t * events = (hipEvent_t*)malloc(sizeof(hipEvent_t) * streams);
   createSingleDeviceEvents(L, state, 2, curDev, events);
   /* Then, wait on them */
   for (int i = 0; i < streams; i++) {
-    THCudaCheck(cudaStreamWaitEvent(streamWaiting, events[i], 0));
-    THCudaCheck(cudaEventDestroy(events[i]));
+    THCudaCheck(hipStreamWaitEvent(streamWaiting, events[i], 0));
+    THCudaCheck(hipEventDestroy(events[i]));
   }
   free(events);
   return 0;
@@ -474,12 +474,12 @@ static int cutorch_streamWaitForMultiDevice(lua_State *L)
   THCState *state = cutorch_getstate(L);
 
   int prevDev = -1;
-  THCudaCheck(cudaGetDevice(&prevDev));
+  THCudaCheck(hipGetDevice(&prevDev));
 
   /* Validate waiting (gpu, stream); this will error out if not */
   int gpuWaiter = (int) luaL_checknumber(L, 1) - 1;
   int streamWaiter = (int) luaL_checknumber(L, 2);
-  cudaStream_t streamWaiting =
+  hipStream_t streamWaiting =
     THCState_getDeviceStream(state, gpuWaiter, streamWaiter);
 
   /* Validate and count set of {gpu={streams...}} we are waiting on */
@@ -498,24 +498,24 @@ static int cutorch_streamWaitForMultiDevice(lua_State *L)
      for that GPU.
      -For (gpuWaiter, streamWaiter), wait on all of the above events.
   */
-  cudaEvent_t* events = (cudaEvent_t*) malloc(sizeof(cudaEvent_t) * streams);
+  hipEvent_t* events = (hipEvent_t*) malloc(sizeof(hipEvent_t) * streams);
 
   /* First, create an event per GPU and record events for the specified stream
      on that GPU */
   createMultiDeviceEvents(L, state, 3, events);
 
   /* Then, wait on the events */
-  THCudaCheck(cudaSetDevice(gpuWaiter));
+  THCudaCheck(hipSetDevice(gpuWaiter));
   for (int i = 0; i < streams; ++i) {
-    THCudaCheck(cudaStreamWaitEvent(streamWaiting, events[i], 0));
+    THCudaCheck(hipStreamWaitEvent(streamWaiting, events[i], 0));
   }
 
   /* Clean up events */
   for (int i = 0; i < streams; ++i) {
-    THCudaCheck(cudaEventDestroy(events[i]));
+    THCudaCheck(hipEventDestroy(events[i]));
   }
   free(events);
-  THCudaCheck(cudaSetDevice(prevDev));
+  THCudaCheck(hipSetDevice(prevDev));
 
   return 0;
 }
@@ -531,7 +531,7 @@ static int cutorch_streamBarrier(lua_State *L)
   THCState *state = cutorch_getstate(L);
 
   int curDev = -1;
-  THCudaCheck(cudaGetDevice(&curDev));
+  THCudaCheck(hipGetDevice(&curDev));
 
   int streams = checkAndCountListOfStreams(L, state, 1, curDev);
 
@@ -541,7 +541,7 @@ static int cutorch_streamBarrier(lua_State *L)
   }
   /* Multi-way dependency (barrier); all streams must complete execution
      of pending scheduled kernels/events */
-  cudaEvent_t * events = (cudaEvent_t*)malloc(sizeof(cudaEvent_t) * streams);
+  hipEvent_t * events = (hipEvent_t*)malloc(sizeof(hipEvent_t) * streams);
   /* First, create an event and record them for all streams */
   int eventsCreated =  createSingleDeviceEvents(L, state, 1, curDev, events);
 
@@ -549,7 +549,7 @@ static int cutorch_streamBarrier(lua_State *L)
      too, but that's harmless and isn't worth weeding out. */
   waitSingleDeviceEvents(L, state, 1, curDev, events, eventsCreated);
   for (int i = 0; i < eventsCreated; i++)
-    THCudaCheck(cudaEventDestroy(events[i]));
+    THCudaCheck(hipEventDestroy(events[i]));
 
   free(events);
   return 0;
@@ -570,7 +570,7 @@ static int cutorch_streamBarrierMultiDevice(lua_State *L)
   THCState *state = cutorch_getstate(L);
 
   int prevDev = -1;
-  THCudaCheck(cudaGetDevice(&prevDev));
+  THCudaCheck(hipGetDevice(&prevDev));
 
   /* Validate and count set of {gpu={streams...}} that are mutually waiting */
   int gpus = 0;
@@ -589,7 +589,7 @@ static int cutorch_streamBarrierMultiDevice(lua_State *L)
      -For each GPU, for each stream, wait on the event created by each other
      GPU.
   */
-  cudaEvent_t* events = (cudaEvent_t*) malloc(sizeof(cudaEvent_t) * streams);
+  hipEvent_t* events = (hipEvent_t*) malloc(sizeof(hipEvent_t) * streams);
 
   /* First, create an event per GPU and record events for the specified stream
      on that GPU */
@@ -601,10 +601,10 @@ static int cutorch_streamBarrierMultiDevice(lua_State *L)
 
   /* Clean up events */
   for (int i = 0; i < streams; ++i) {
-    THCudaCheck(cudaEventDestroy(events[i]));
+    THCudaCheck(hipEventDestroy(events[i]));
   }
   free(events);
-  THCudaCheck(cudaSetDevice(prevDev));
+  THCudaCheck(hipSetDevice(prevDev));
 
   return 0;
 }
@@ -613,7 +613,7 @@ static int cutorch_streamBarrierMultiDevice(lua_State *L)
    Usage:
    cutorch.streamSynchronize(n)
    For the current device, synchronizes with the given stream only
-   (cudaStreamSynchronize).
+   (hipStreamSynchronize).
    0 is the default stream on the device.
 */
 static int cutorch_streamSynchronize(lua_State *L)
@@ -622,11 +622,11 @@ static int cutorch_streamSynchronize(lua_State *L)
   int streamId = (int) luaL_checknumber(L, 1);
 
   int curDev = -1;
-  THCudaCheck(cudaGetDevice(&curDev));
+  THCudaCheck(hipGetDevice(&curDev));
 
   /* This also validates the stream */
-  cudaStream_t stream = THCState_getDeviceStream(state, curDev, streamId);
-  THCudaCheck(cudaStreamSynchronize(stream));
+  hipStream_t stream = THCState_getDeviceStream(state, curDev, streamId);
+  THCudaCheck(hipStreamSynchronize(stream));
 
   return 0;
 }
@@ -634,7 +634,7 @@ static int cutorch_streamSynchronize(lua_State *L)
 static int cutorch_getDevice(lua_State *L)
 {
   int device;
-  THCudaCheck(cudaGetDevice(&device));
+  THCudaCheck(hipGetDevice(&device));
   device++;
   lua_pushnumber(L, device);
   return 1;
@@ -650,7 +650,7 @@ static int cutorch_deviceReset(lua_State *L)
 static int cutorch_getDeviceCount(lua_State *L)
 {
   int ndevice;
-  THCudaCheck(cudaGetDeviceCount(&ndevice));
+  THCudaCheck(hipGetDeviceCount(&ndevice));
   lua_pushnumber(L, ndevice);
   return 1;
 }
@@ -711,16 +711,16 @@ static int cutorch_getMemoryUsage(lua_State *L) {
   size_t freeBytes = 0;
   size_t totalBytes = 0;
   int curDevice;
-  THCudaCheck(cudaGetDevice(&curDevice));
+  THCudaCheck(hipGetDevice(&curDevice));
   THCState *state = cutorch_getstate(L);
 
   int device = luaL_optint(L, 1, -10);
   if (device == -10) { /* no argument passed, current device mem usage */
     THCudaCheck(THCudaMemGetInfo(state, &freeBytes, &totalBytes));
   } else { /* argument was given, particular device's memory usage */
-    THCudaCheck(cudaSetDevice(device-1)); /* zero indexed */
+    THCudaCheck(hipSetDevice(device-1)); /* zero indexed */
     THCudaCheck(THCudaMemGetInfo(state, &freeBytes, &totalBytes));
-    THCudaCheck(cudaSetDevice(curDevice));
+    THCudaCheck(hipSetDevice(curDevice));
   }
   lua_pushnumber(L, freeBytes);
   lua_pushnumber(L, totalBytes);
@@ -731,7 +731,7 @@ static int cutorch_setDevice(lua_State *L)
 {
   THCState *state = cutorch_getstate(L);
   int device = (int)luaL_checknumber(L, 1)-1;
-  THCudaCheck(cudaSetDevice(device));
+  THCudaCheck(hipSetDevice(device));
   return 0;
 }
 
@@ -743,13 +743,13 @@ static int cutorch_getDeviceProperties(lua_State *L)
 {
   int device = (int)luaL_checknumber(L, 1)-1;
 
-  // switch context to given device so the call to cudaMemGetInfo is for the correct device
+  // switch context to given device so the call to hipMemGetInfo is for the correct device
   int oldDevice;
-  THCudaCheck(cudaGetDevice(&oldDevice));
-  THCudaCheck(cudaSetDevice(device));
+  THCudaCheck(hipGetDevice(&oldDevice));
+  THCudaCheck(hipSetDevice(device));
 
-  struct cudaDeviceProp prop;
-  THCudaCheck(cudaGetDeviceProperties(&prop, device));
+  struct hipDeviceProp prop;
+  THCudaCheck(hipGetDeviceProperties(&prop, device));
   lua_newtable(L);
   SET_DEVN_PROP(canMapHostMemory);
   SET_DEVN_PROP(clockRate);
@@ -775,7 +775,7 @@ static int cutorch_getDeviceProperties(lua_State *L)
   SET_DEVN_PROP(maxTexture1DLinear);
 
   size_t freeMem;
-  THCudaCheck(cudaMemGetInfo (&freeMem, NULL));
+  THCudaCheck(hipMemGetInfo (&freeMem, NULL));
   lua_pushnumber(L, freeMem);
   lua_setfield(L, -2, "freeGlobalMem");
 
@@ -783,7 +783,7 @@ static int cutorch_getDeviceProperties(lua_State *L)
   lua_setfield(L, -2, "name");
 
   // restore context
-  THCudaCheck(cudaSetDevice(oldDevice));
+  THCudaCheck(hipSetDevice(oldDevice));
 
   return 1;
 }
@@ -791,7 +791,7 @@ static int cutorch_getDeviceProperties(lua_State *L)
 static int cutorch_getRuntimeVersion(lua_State *L)
 {
   int version;
-  THCudaCheck(cudaRuntimeGetVersion(&version));
+  THCudaCheck(hipRuntimeGetVersion(&version));
   lua_pushnumber(L, version);
   return 1;
 }
@@ -799,7 +799,7 @@ static int cutorch_getRuntimeVersion(lua_State *L)
 static int cutorch_getDriverVersion(lua_State *L)
 {
   int version;
-  THCudaCheck(cudaDriverGetVersion(&version));
+  THCudaCheck(hipDriverGetVersion(&version));
   lua_pushnumber(L, version);
   return 1;
 }
@@ -864,11 +864,11 @@ static int cutorch_getState(lua_State *L)
 
 static int cutorch_Event_new(lua_State *L)
 {
-  cudaEvent_t *event = luaT_alloc(L, sizeof(cudaEvent_t));
-  THCudaCheck(cudaEventCreate(event));
+  hipEvent_t *event = luaT_alloc(L, sizeof(hipEvent_t));
+  THCudaCheck(hipEventCreate(event));
 
   THCState *state = cutorch_getstate(L);
-  THCudaCheck(cudaEventRecord(*event, THCState_getCurrentStream(state)));
+  THCudaCheck(hipEventRecord(*event, THCState_getCurrentStream(state)));
   luaT_pushudata(L, event, "cutorch.Event");
 
   return 1;
@@ -876,8 +876,8 @@ static int cutorch_Event_new(lua_State *L)
 
 static int cutorch_Event_free(lua_State *L)
 {
-  cudaEvent_t *event = luaT_checkudata(L, 1, "cutorch.Event");
-  THCudaCheck(cudaEventDestroy(*event));
+  hipEvent_t *event = luaT_checkudata(L, 1, "cutorch.Event");
+  THCudaCheck(hipEventDestroy(*event));
   luaT_free(L, event);
 
   return 0;
@@ -885,9 +885,9 @@ static int cutorch_Event_free(lua_State *L)
 
 static int cutorch_Event_waitOn(lua_State *L)
 {
-  cudaEvent_t *event = luaT_checkudata(L, 1, "cutorch.Event");
+  hipEvent_t *event = luaT_checkudata(L, 1, "cutorch.Event");
   THCState *state = cutorch_getstate(L);
-  THCudaCheck(cudaStreamWaitEvent(THCState_getCurrentStream(state), *event, 0));
+  THCudaCheck(hipStreamWaitEvent(THCState_getCurrentStream(state), *event, 0));
 
   return 0;
 }
@@ -929,9 +929,9 @@ static int cutorch_isManagedPtr(lua_State *L)
     THError("Must receive a ptr cast as a number");
   }
   void* ptr = (void* )luaL_optinteger(L, 1, 0);
-  struct cudaPointerAttributes attributes;
-  cudaError_t res = cudaPointerGetAttributes(&attributes, ptr);
-  if (res == cudaErrorInvalidValue) {
+  struct hipPointerAttributes attributes;
+  hipError_t res = hipPointerGetAttributes(&attributes, ptr);
+  if (res == hipErrorInvalidValue) {
     lua_pushboolean(L, 0);
   } else {
     THCudaCheck(res);
@@ -1038,7 +1038,7 @@ int luaopen_libcutorch(lua_State *L)
   char* thc_caching_allocator = getenv("THC_CACHING_ALLOCATOR");
   if (!thc_caching_allocator || strcmp(thc_caching_allocator, "0") != 0) {
     THCState_setDeviceAllocator(state, THCCachingAllocator_get());
-    state->cudaHostAllocator = &THCCachingHostAllocator;
+    state->hipHostAllocator = &THCCachingHostAllocator;
   }
 
   THCudaInit(state);
@@ -1120,7 +1120,7 @@ int luaopen_libcutorch(lua_State *L)
 
   /* store gpu driver version in field */
   int driverVersion;
-  THCudaCheck(cudaDriverGetVersion(&driverVersion));
+  THCudaCheck(hipDriverGetVersion(&driverVersion));
   lua_pushinteger(L, driverVersion);
   lua_setfield(L, -2, "driverVersion");
 
